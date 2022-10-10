@@ -1,0 +1,10 @@
+library changelog: false, identifier: 'pipeline-libraries@main',
+    retriever: modernSCM([
+      $class: 'GitSCMSource',
+      credentialsId: 'compliance-gh-app-ro',
+      remote: 'https://github.com/cloudbees-compliance/cbc-jenkins-shared-library.git'
+])
+
+buildDeployGoModule {
+    moduleName     = 'plugin-jenkins-master'
+}
