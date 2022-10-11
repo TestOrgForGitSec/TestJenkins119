@@ -103,6 +103,31 @@ func toMasterResponse(jobDetails *gojenkins.JobResponse) *domain.MasterResponse 
 	}
 }
 
+func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req *service.AuthCheckRequest) (*service.AuthCheckResult, error) {
+	var result = service.AuthResult_SUCCESS
+	ac := req.Account
+	credData, err := cs.parseAccount(ac)
+	if err != nil {
+		result = service.AuthResult_CREDENTIALS_MISSING
+	} else {
+		var creds jenkinsCreds
+		if err := json.Unmarshal([]byte(credData.Credentials), &creds); err != nil {
+			log.Error().Err(err).Msg("Unable to unmarshal credentials")
+			result = service.AuthResult_CREDENTIALS_MISSING
+		} else {
+			jenkins := gojenkins.CreateJenkins(nil, creds.URL, creds.UserID, creds.Token)
+			_, err := jenkins.GetAllJobs(ctx)
+			if err != nil {
+				result = service.AuthResult_AUTHENTICATION_FAILURE
+			}
+		}
+	}
+
+	return &service.AuthCheckResult{
+		Result: &result,
+	}, nil
+}
+
 func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest) ([]*domain.MasterResponse, error) {
 	ctx = createLogger(req, ctx)
 	requestId := ctx.Value("requestId").(string)
