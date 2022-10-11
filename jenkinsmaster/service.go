@@ -116,8 +116,7 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			result = service.AuthResult_CREDENTIALS_MISSING
 		} else {
 			jenkins := gojenkins.CreateJenkins(nil, creds.URL, creds.UserID, creds.Token)
-			_, err := jenkins.GetAllJobs(ctx)
-			if err != nil {
+			if _, err := jenkins.Init(ctx); err != nil {
 				result = service.AuthResult_AUTHENTICATION_FAILURE
 			}
 		}
