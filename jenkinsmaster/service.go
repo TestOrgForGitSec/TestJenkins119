@@ -127,6 +127,30 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 	}, nil
 }
 
+func (cs *jenkinsMasterService) getInnerJobs(ctx context.Context, j *gojenkins.Job) ([]*gojenkins.Job, error) {
+	var pipelines []*gojenkins.Job
+	nestedJobs, err := j.GetInnerJobs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, nestedJob := range nestedJobs {
+		job := nestedJob
+		switch GetJobClass(job.Raw.Class) {
+		case JobClassFolder:
+			if nextLevel, err := cs.getInnerJobs(ctx, job); err != nil {
+				return nil, err
+			} else {
+				pipelines = append(pipelines, nextLevel...)
+			}
+		case JobClassPipeline:
+			pipelines = append(pipelines, job)
+		}
+	}
+
+	return pipelines, nil
+}
+
 func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest) ([]*domain.MasterResponse, error) {
 	ctx = createLogger(req, ctx)
 	requestId := ctx.Value("requestId").(string)
@@ -159,23 +183,17 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 	var masterResponses []*domain.MasterResponse
 
 	for _, job := range jobs {
-		jobType := GetJobClass(job.Raw.Class)
-
-		if jobType == JobClassFolder {
-			nestedJobs, err := job.GetInnerJobs(ctx)
-
-			if err != nil {
+		switch GetJobClass(job.Raw.Class) {
+		case JobClassFolder:
+			if nestedJobs, err := cs.getInnerJobs(ctx, job); err != nil {
 				log.Error(requestId).Err(err).Msg("Unable to get nested jobs")
 				return nil, err
-			}
-
-			for _, nestedJob := range nestedJobs {
-				nestedJobType := GetJobClass(nestedJob.Raw.Class)
-				if nestedJobType == JobClassPipeline {
+			} else {
+				for _, nestedJob := range nestedJobs {
 					masterResponses = append(masterResponses, toMasterResponse(nestedJob.GetDetails()))
 				}
 			}
-		} else if jobType == JobClassPipeline {
+		case JobClassPipeline:
 			masterResponses = append(masterResponses, toMasterResponse(job.GetDetails()))
 		}
 	}
