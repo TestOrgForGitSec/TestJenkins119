@@ -28,7 +28,7 @@ type jenkinsCreds struct {
 }
 
 type jenkinsMasterService struct {
-	plugin.CHPluginService
+	service.CHPluginServiceServer
 }
 
 func NewJenkinsMasterService() plugin.CHPluginService {
@@ -151,7 +151,7 @@ func (cs *jenkinsMasterService) getInnerJobs(ctx context.Context, j *gojenkins.J
 	return pipelines, nil
 }
 
-func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest) ([]*domain.MasterResponse, error) {
+func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest, stream service.CHPluginService_MasterServer) ([]*domain.MasterResponse, error) {
 	ctx = createLogger(req, ctx)
 	requestId := ctx.Value("requestId").(string)
 	defer log.DestroySubLogger(requestId)
@@ -223,4 +223,21 @@ func createLogger(req *service.ExecuteRequest, ctx context.Context) (contxt cont
 
 	return ctx
 
+}
+
+// Empty function definitions required to satisfy the CHPluginServiceServer interface
+func (cs *jenkinsMasterService) ExecuteDecorator(context.Context, *service.ExecuteRequest, plugin.AssetFetcher, service.CHPluginService_DecoratorServer) (*service.ExecuteDecoratorResponse, error) {
+	return nil, errors.New("Does not  support this role")
+}
+
+func (cs *jenkinsMasterService) ExecuteAnalyser(context.Context, *service.ExecuteRequest, plugin.AssetFetcher, service.CHPluginService_AnalyserServer) (*service.ExecuteAnalyserResponse, error) {
+	return nil, errors.New("Does not  support this role")
+}
+
+func (cs *jenkinsMasterService) ExecuteAggregator(context.Context, *service.ExecuteRequest, plugin.AssetFetcher, service.CHPluginService_AggregatorServer) (*service.ExecuteAggregatorResponse, error) {
+	return nil, errors.New("Does not  support this role")
+}
+
+func (cs *jenkinsMasterService) ExecuteAssessor(context.Context, *service.ExecuteRequest, plugin.AssetFetcher, service.CHPluginService_AssessorServer) (*service.ExecuteAssessorResponse, error) {
+	return nil, errors.New("Does not  support this role")
 }
