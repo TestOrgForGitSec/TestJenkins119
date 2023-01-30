@@ -156,6 +156,8 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 	requestId := ctx.Value("requestId").(string)
 	defer log.DestroySubLogger(requestId)
 
+	log.Debug(requestId).Msg("Jenkins master execution started")
+
 	ac := req.Account
 	credData, err := cs.parseAccount(ac)
 	if err != nil {
@@ -166,19 +168,22 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		log.Error(requestId).Err(err).Msg("Unable to unmarshal credentials")
 		return nil, err
 	}
-
+	log.Debug(requestId).Msg("gojenkins.CreateJenkins step start")
 	jenkins := gojenkins.CreateJenkins(nil, creds.URL, creds.UserID, creds.Token)
+	log.Debug(requestId).Msg("gojenkins.CreateJenkins step end")
 
 	if _, err := jenkins.Init(ctx); err != nil {
 		log.Error(requestId).Err(err).Msg("Unable to initialise Jenkins client")
 		return nil, err
 	}
+	log.Debug(requestId).Msg("jenkins.Init passed")
 
 	jobs, err := jenkins.GetAllJobs(ctx)
 	if err != nil {
 		log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
 		return nil, err
 	}
+	log.Debug(requestId).Msgf("jenkins.GetAllJobs passed. %d jobs found", len(jobs))
 
 	var masterResponses []*domain.MasterResponse
 
@@ -197,7 +202,7 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 			masterResponses = append(masterResponses, toMasterResponse(job.GetDetails()))
 		}
 	}
-
+	log.Debug(requestId).Msgf("Length of response to CE", len(masterResponses))
 	return masterResponses, nil
 }
 
