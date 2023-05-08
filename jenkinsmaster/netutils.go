@@ -1,7 +1,7 @@
 package jenkinsmaster
 
 import (
-	"fmt"
+	"github.com/deliveryblueprints/chlog-go/log"
 	"net/http"
 	"net/http/httputil"
 )
@@ -10,15 +10,18 @@ type loggingTransport struct{}
 
 func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	bytes, _ := httputil.DumpRequestOut(r, true)
+	log.Debug().Msgf("Jenkins request is: %s", bytes)
 
+	values := r.URL.Query()
+	values.Add("tree", "*") //Additional client specific parameter
+	r.URL.RawQuery = values.Encode()
+
+	log.Debug().Msgf("Jenkins request URL: %s", r.URL.String())
 	resp, err := http.DefaultTransport.RoundTrip(r)
-	// err is returned after dumping the response
 
 	respBytes, _ := httputil.DumpResponse(resp, true)
 	bytes = append(bytes, respBytes...)
-
-	fmt.Printf("%s\n", bytes)
-
+	log.Debug().Msgf("Jenkins response is: %s", bytes)
 	return resp, err
 }
 
