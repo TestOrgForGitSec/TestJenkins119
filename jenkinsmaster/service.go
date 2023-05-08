@@ -115,10 +115,8 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			log.Error().Err(err).Msg("Unable to unmarshal credentials")
 			result = service.AuthResult_CREDENTIALS_MISSING
 		} else {
-			log.Debug().Msgf("Attempting creation of Jenkins session")
 			client := GetHttpClient()
 			jenkins := gojenkins.CreateJenkins(&client, creds.URL, creds.UserID, creds.Token)
-			log.Debug().Msgf("Jenkins session successfully created")
 			if _, err := jenkins.Init(ctx); err != nil {
 				log.Error().Err(err).Msgf("Authentication failed")
 				result = service.AuthResult_AUTHENTICATION_FAILURE
@@ -173,7 +171,8 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		return nil, err
 	}
 	log.Debug(requestId).Msg("gojenkins.CreateJenkins step start")
-	jenkins := gojenkins.CreateJenkins(nil, creds.URL, creds.UserID, creds.Token)
+	client := GetHttpClient()
+	jenkins := gojenkins.CreateJenkins(&client, creds.URL, creds.UserID, creds.Token)
 	log.Debug(requestId).Msg("gojenkins.CreateJenkins step end")
 
 	if _, err := jenkins.Init(ctx); err != nil {
