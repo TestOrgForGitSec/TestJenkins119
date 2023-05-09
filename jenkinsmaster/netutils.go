@@ -13,7 +13,7 @@ func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	log.Debug().Msgf("Jenkins request is: %s", bytes)
 
 	values := r.URL.Query()
-	values.Add("tree", "jobs[name,url],*") //Additiona parameter added
+	values.Add("tree", "jobs[name,url],*") //AdditionalA parameter added
 	r.URL.RawQuery = values.Encode()
 
 	log.Debug().Msgf("Jenkins request URL: %s", r.URL.String())
