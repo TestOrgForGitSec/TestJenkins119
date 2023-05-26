@@ -1,7 +1,7 @@
 package jenkinsmaster
 
 import (
-	"github.com/deliveryblueprints/chlog-go/log"
+	"github.com/cloudbees-compliance/chlog-go/log"
 	"net/http"
 	"net/http/httputil"
 )

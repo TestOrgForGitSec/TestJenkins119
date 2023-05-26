@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/cloudbees-compliance/chplugin-service-go/plugin"
 	"github.com/cloudbees-compliance/compliance-hub-plugin-jenkins-master/jenkinsmaster"
-	"github.com/deliveryblueprints/chplugin-service-go/plugin"
 	"github.com/spf13/viper"
 	"net"
 	"time"
 
+	"github.com/cloudbees-compliance/chlog-go/log"
+	service "github.com/cloudbees-compliance/chplugin-go/v0.4.0/servicev0_4_0"
 	"github.com/cloudbees-compliance/compliance-hub-plugin-jenkins-master/config"
-	"github.com/deliveryblueprints/chlog-go/log"
-	service "github.com/deliveryblueprints/chplugin-go/v0.4.0/servicev0_4_0"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 )
