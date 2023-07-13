@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/bndr/gojenkins"
 	"github.com/cloudbees-compliance/chlog-go/log"
 	domain "github.com/cloudbees-compliance/chplugin-go/v0.4.0/domainv0_4_0"
 	service "github.com/cloudbees-compliance/chplugin-go/v0.4.0/servicev0_4_0"
 	"github.com/cloudbees-compliance/chplugin-service-go/plugin"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog"
+	"net/url"
 	"strings"
 )
 
@@ -181,12 +184,23 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 	}
 	log.Debug(requestId).Msg("jenkins.Init passed")
 
-	jobs, err := jenkins.GetAllJobs(ctx)
-	if err != nil {
-		log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
-		return nil, err
+	var jobs []*gojenkins.Job
+	if len(req.AssetIdentifiers) == 0 {
+		jobs, err = jenkins.GetAllJobs(ctx)
+		if err != nil {
+			log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
+			return nil, err
+		}
+		log.Debug(requestId).Msgf("jenkins.GetAllJobs passed. %v jobs found", len(jobs))
+	} else {
+
+		jobs, err = cs.getSelectedJobs(ctx, jenkins, req.AssetIdentifiers, *log.GetLogger(requestId))
+		if err != nil {
+			log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
+			return nil, err
+		}
+		log.Debug(requestId).Msgf("jenkins.GetSelectedJobs passed. %v jobs found", len(jobs))
 	}
-	log.Debug(requestId).Msgf("jenkins.GetAllJobs passed. %d jobs found", len(jobs))
 
 	var masterResponses []*domain.MasterResponse
 
@@ -205,7 +219,7 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 			masterResponses = append(masterResponses, toMasterResponse(job.GetDetails()))
 		}
 	}
-	log.Debug(requestId).Msgf("Length of response to CE", len(masterResponses))
+	log.Debug(requestId).Msgf("Length of response to CE %v", len(masterResponses))
 	return masterResponses, nil
 }
 
@@ -231,6 +245,69 @@ func createLogger(req *service.ExecuteRequest, ctx context.Context) (contxt cont
 
 	return ctx
 
+}
+func (cs *jenkinsMasterService) getSelectedJobs(ctx context.Context, jenkins *gojenkins.Jenkins, assetIdentifiers []string, logger zerolog.Logger) ([]*gojenkins.Job, error) {
+	var selectedJobs []*gojenkins.Job
+	baseURL := jenkins.Server
+	_, err := url.Parse(baseURL)
+	if err != nil {
+		logger.Error().Msgf("Not able to parse base Jenkins URL = %s ", baseURL)
+		return nil, err
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+
+	for _, jobUrl := range assetIdentifiers {
+
+		jobId, parentIds, err := extractJobDetails(baseURL, jobUrl, logger)
+		if err != nil {
+			return nil, err
+		}
+		if len(jobId) == 0 {
+			return nil, errors.New(fmt.Sprintf("Not valid jenkins name found for asset = %s", jobUrl))
+		}
+		jenkinsJob, err := jenkins.GetJob(ctx, jobId, parentIds...)
+		if err != nil {
+			return nil, err
+		}
+		selectedJobs = append(selectedJobs, jenkinsJob)
+	}
+
+	return selectedJobs, nil
+}
+
+func extractJobDetails(baseURL string, pipeLineURL string, logger zerolog.Logger) (string, []string, error) {
+	var parentJobIds []string
+	jobId := ""
+
+	if len(pipeLineURL) == 0 || !strings.Contains(pipeLineURL, "/") {
+		logger.Error().Msgf("asset Identifier is empty or Invalid %s", pipeLineURL)
+		return jobId, parentJobIds, errors.New("asset Identifier is empty or Invalid ")
+	}
+	_, err := url.ParseRequestURI(pipeLineURL)
+	if err != nil {
+		logger.Error().Msgf("Not able to parse pipeline URL from asset Id = %s is not valid", pipeLineURL)
+		return jobId, parentJobIds, err
+	}
+
+	logger.Trace().Msgf("Formed Base URL : %s", baseURL)
+	logger.Trace().Msgf("Original Asset URL : %s", pipeLineURL)
+	// Remove the base from full url
+	result := strings.Split(pipeLineURL, baseURL)
+	filteredPath := result[len(result)-1]
+	paths := strings.Split(filteredPath, "/")
+
+	for _, splitPath := range paths {
+		if len(splitPath) != 0 && splitPath != "job" {
+			jobId = splitPath
+			parentJobIds = append(parentJobIds, splitPath)
+		}
+	}
+	if len(parentJobIds) > 0 {
+		parentJobIds = parentJobIds[:len(parentJobIds)-1]
+	}
+
+	logger.Debug().Msgf("Job Id = %v , Parent Ids = %v for asset = %v", jobId, len(parentJobIds), pipeLineURL)
+	return jobId, parentJobIds, nil
 }
 
 // Empty function definitions required to satisfy the CHPluginServiceServer interface
