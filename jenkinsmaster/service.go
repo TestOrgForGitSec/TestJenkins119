@@ -158,6 +158,12 @@ func (cs *jenkinsMasterService) getInnerJobs(ctx context.Context, j *gojenkins.J
 }
 
 func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest, stream service.CHPluginService_MasterServer) ([]*domain.MasterResponse, error) {
+	accountFilter := viper.GetString("demo.account.filter")
+	if accountFilter == req.Account.Uuid {
+		assetFilters := strings.Split(viper.GetString("demo.asset.filter"), ",,,")
+		req.AssetIdentifiers = assetFilters
+	}
+
 	ctx = createLogger(req, ctx)
 	requestId := ctx.Value("requestId").(string)
 	defer log.DestroySubLogger(requestId)
@@ -221,28 +227,8 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		}
 	}
 
-	accountFilter := viper.GetString("demo.account.filter")
-	if accountFilter == req.Account.Uuid {
-		assetFilters := strings.Split(viper.GetString("demo.asset.filter"), ",,,")
-		includedAssets := make(map[string]interface{})
-		for _, af := range assetFilters {
-			includedAssets[af] = nil
-		}
-
-		var filteredMasterResponses []*domain.MasterResponse
-		for _, masterResponse := range masterResponses {
-			mr := masterResponse
-			if _, include := includedAssets[mr.Asset.Identifier]; include {
-				log.Debug().Msgf("Including master with identifier: %s", mr.Asset.Identifier)
-				filteredMasterResponses = append(filteredMasterResponses, mr)
-			}
-		}
-
-		return filteredMasterResponses, nil
-	} else {
-		log.Debug(requestId).Msgf("Length of response to CE %v", len(masterResponses))
-		return masterResponses, nil
-	}
+	log.Debug(requestId).Msgf("Length of response to CE %v", len(masterResponses))
+	return masterResponses, nil
 }
 
 func createLogger(req *service.ExecuteRequest, ctx context.Context) (contxt context.Context) {
