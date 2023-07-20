@@ -12,6 +12,7 @@ import (
 	"github.com/cloudbees-compliance/chplugin-service-go/plugin"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
+	"github.com/spf13/viper"
 	"net/url"
 	"strings"
 )
@@ -219,8 +220,29 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 			masterResponses = append(masterResponses, toMasterResponse(job.GetDetails()))
 		}
 	}
-	log.Debug(requestId).Msgf("Length of response to CE %v", len(masterResponses))
-	return masterResponses, nil
+
+	accountFilter := viper.GetString("demo.account.filter")
+	if accountFilter == req.Account.Uuid {
+		assetFilters := strings.Split(viper.GetString("demo.asset.filter"), ",,,")
+		includedAssets := make(map[string]interface{})
+		for _, af := range assetFilters {
+			includedAssets[af] = nil
+		}
+
+		var filteredMasterResponses []*domain.MasterResponse
+		for _, masterResponse := range masterResponses {
+			mr := masterResponse
+			if _, include := includedAssets[mr.Asset.Identifier]; include {
+				log.Debug().Msgf("Including master with identifier: %s", mr.Asset.Identifier)
+				filteredMasterResponses = append(filteredMasterResponses, mr)
+			}
+		}
+
+		return filteredMasterResponses, nil
+	} else {
+		log.Debug(requestId).Msgf("Length of response to CE %v", len(masterResponses))
+		return masterResponses, nil
+	}
 }
 
 func createLogger(req *service.ExecuteRequest, ctx context.Context) (contxt context.Context) {

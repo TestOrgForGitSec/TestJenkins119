@@ -27,4 +27,8 @@ func InitConfig() {
 	viper.SetDefault("log.useconsolewriter", false)
 	viper.SetDefault("log.unixtime", false)
 	viper.SetDefault("log.level", "debug")
+
+	// demo stuff
+	viper.SetDefault("demo.account.filter", "")
+	viper.SetDefault("demo.asset.filter", "")
 }
