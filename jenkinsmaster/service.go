@@ -216,14 +216,14 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 			log.Error(requestId).Msg("Account Metadata is missing in the request")
 			return nil, errors.New("error occurred while executing Jenkins Master...")
 		}
-		err = json.Unmarshal(req.Account.Metadata, &pipelineMeta) //null check
+		err = json.Unmarshal(req.Account.Metadata, &pipelineMeta)
 		if err != nil {
 			log.Error(requestId).Err(err).Msg("Unable to unmarshal Jenkins jobs from Account Metadata")
 			return nil, errors.New("error occurred while executing Jenkins Master...")
 		}
-		log.Debug(requestId).Msg(fmt.Sprintf("pipelineMeta: %v\n", pipelineMeta)) //add log
-		parentIds := []string{}
+		log.Debug(requestId).Msg(fmt.Sprintf("pipelineMeta: %v\n", pipelineMeta))
 		for _, value := range pipelineMeta["pipeline"] {
+			parentIds := []string{}
 			log.Debug(requestId).Msg(fmt.Sprintf("Selected Job: %v\n", value))
 			tokens := strings.Split(value, "/")
 			if len(tokens) > 0 {
@@ -236,7 +236,6 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 			}
 			jobs = append(jobs, job)
 		}
-
 	} else {
 		jobs, err = cs.getSelectedJobs(ctx, jenkins, req.AssetIdentifiers, *log.GetLogger(requestId))
 		if err != nil {
