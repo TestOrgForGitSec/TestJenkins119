@@ -126,25 +126,30 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			if _, err := jenkins.Init(ctx); err != nil {
 				log.Error().Err(err).Msgf("Authentication failed")
 				result = service.AuthResult_AUTHENTICATION_FAILURE
+				return &service.AuthCheckResult{
+					Result: &result,
+				}, nil
 			}
 			log.Debug().Msg("Jenkins Authentication passed")
 			var jobs []*gojenkins.Job
 			jobs, err = jenkins.GetAllJobs(ctx)
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to get Jenkins jobs")
+				result = service.AuthResult_AUTHENTICATION_FAILURE
 				return &service.AuthCheckResult{
 					Result:          &result,
 					AccountMetadata: nil,
-				}, err
+				}, nil
 			}
 			log.Debug().Msgf("jenkins.GetAllJobs passed. %v jobs found", len(jobs))
 			acctMeta, err = cs.makeAccountMetadata(ctx, jobs)
 			if err != nil {
 				log.Error().Err(err).Msg("Error occurred while building Account Metadata")
+				result = service.AuthResult_AUTHENTICATION_FAILURE
 				return &service.AuthCheckResult{
 					Result:          &result,
 					AccountMetadata: nil,
-				}, err
+				}, nil
 			}
 		}
 	}
@@ -214,12 +219,12 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		var job *gojenkins.Job
 		if req.Account.Metadata == nil {
 			log.Error(requestId).Msg("Account Metadata is missing in the request")
-			return nil, errors.New("error occurred while executing Jenkins Master...")
+			return nil, errors.New("error occurred while executing Jenkins Master")
 		}
 		err = json.Unmarshal(req.Account.Metadata, &pipelineMeta)
 		if err != nil {
 			log.Error(requestId).Err(err).Msg("Unable to unmarshal Jenkins jobs from Account Metadata")
-			return nil, errors.New("error occurred while executing Jenkins Master...")
+			return nil, errors.New("error occurred while executing Jenkins Master")
 		}
 		log.Debug(requestId).Msg(fmt.Sprintf("pipelineMeta: %v\n", pipelineMeta))
 		for _, value := range pipelineMeta["pipeline"] {
