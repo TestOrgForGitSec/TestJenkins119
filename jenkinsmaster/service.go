@@ -109,25 +109,25 @@ func toMasterResponse(jobDetails *gojenkins.JobResponse) *domain.MasterResponse 
 }
 
 func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req *service.AuthCheckRequest) (*service.AuthCheckResult, error) {
-	var result = service.AuthResult_SUCCESS
+	var result = service.AuthResult_SUCCESS.Enum()
 	ac := req.Account
 	credData, err := cs.parseAccount(ac)
 	var acctMeta []byte
 	if err != nil {
-		result = service.AuthResult_CREDENTIALS_MISSING
+		result = service.AuthResult_CREDENTIALS_MISSING.Enum()
 	} else {
 		var creds jenkinsCreds
 		if err := json.Unmarshal([]byte(credData.Credentials), &creds); err != nil {
 			log.Error().Err(err).Msg("Unable to unmarshal credentials")
-			result = service.AuthResult_CREDENTIALS_MISSING
+			result = service.AuthResult_CREDENTIALS_MISSING.Enum()
 		} else {
 			client := GetHttpClient()
 			jenkins := gojenkins.CreateJenkins(&client, creds.URL, creds.UserID, creds.Token)
 			if _, err := jenkins.Init(ctx); err != nil {
 				log.Error().Err(err).Msgf("Authentication failed")
-				result = service.AuthResult_AUTHENTICATION_FAILURE
+				result = service.AuthResult_AUTHENTICATION_FAILURE.Enum()
 				return &service.AuthCheckResult{
-					Result: &result,
+					Result: result,
 				}, nil
 			}
 			log.Debug().Msg("Jenkins Authentication passed")
@@ -135,9 +135,9 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			jobs, err = jenkins.GetAllJobs(ctx)
 			if err != nil {
 				log.Error().Err(err).Msg("Unable to get Jenkins jobs")
-				result = service.AuthResult_AUTHENTICATION_FAILURE
+				result = service.AuthResult_AUTHENTICATION_FAILURE.Enum()
 				return &service.AuthCheckResult{
-					Result:          &result,
+					Result:          result,
 					AccountMetadata: nil,
 				}, nil
 			}
@@ -145,9 +145,9 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			acctMeta, err = cs.makeAccountMetadata(ctx, jobs)
 			if err != nil {
 				log.Error().Err(err).Msg("Error occurred while building Account Metadata")
-				result = service.AuthResult_AUTHENTICATION_FAILURE
+				result = service.AuthResult_AUTHENTICATION_FAILURE.Enum()
 				return &service.AuthCheckResult{
-					Result:          &result,
+					Result:          result,
 					AccountMetadata: nil,
 				}, nil
 			}
@@ -155,7 +155,7 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 	}
 
 	return &service.AuthCheckResult{
-		Result:          &result,
+		Result:          result,
 		AccountMetadata: acctMeta,
 	}, nil
 }
