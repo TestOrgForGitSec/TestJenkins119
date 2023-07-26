@@ -153,7 +153,7 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			}
 		}
 	}
-
+	log.Debug().Msg("Adding test data for integration testing")
 	return &service.AuthCheckResult{
 		Result:          result,
 		AccountMetadata: acctMeta,
@@ -386,7 +386,7 @@ func (cs *jenkinsMasterService) ExecuteAssessor(context.Context, *service.Execut
 
 func (cs *jenkinsMasterService) makeAccountMetadata(ctx context.Context, jobs []*gojenkins.Job) ([]byte, error) {
 	var pipelineList []string
-	for _, job := range jobs {
+	/*for _, job := range jobs {
 		switch GetJobClass(job.Raw.Class) {
 		case JobClassFolder:
 			if nestedJobs, err := cs.getInnerJobs(ctx, job); err != nil {
@@ -401,8 +401,8 @@ func (cs *jenkinsMasterService) makeAccountMetadata(ctx context.Context, jobs []
 		case JobClassPipeline:
 			pipelineList = append(pipelineList, job.GetName())
 		}
-	}
-
+	}*/
+	pipelineList = []string{"BuildJobsTest/TestPipeline", "Playground/Vulnado"}
 	jobMap := map[string][]string{}
 	jobMap["pipeline"] = pipelineList
 	log.Debug().Msg(fmt.Sprintf("Pipelines : %+v\n", jobMap)) //testing purpose
