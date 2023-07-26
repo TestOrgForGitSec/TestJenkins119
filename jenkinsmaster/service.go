@@ -109,54 +109,28 @@ func toMasterResponse(jobDetails *gojenkins.JobResponse) *domain.MasterResponse 
 }
 
 func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req *service.AuthCheckRequest) (*service.AuthCheckResult, error) {
-	var result = service.AuthResult_SUCCESS.Enum()
+	var result = service.AuthResult_SUCCESS
 	ac := req.Account
 	credData, err := cs.parseAccount(ac)
-	var acctMeta []byte
 	if err != nil {
-		result = service.AuthResult_CREDENTIALS_MISSING.Enum()
+		result = service.AuthResult_CREDENTIALS_MISSING
 	} else {
 		var creds jenkinsCreds
 		if err := json.Unmarshal([]byte(credData.Credentials), &creds); err != nil {
 			log.Error().Err(err).Msg("Unable to unmarshal credentials")
-			result = service.AuthResult_CREDENTIALS_MISSING.Enum()
+			result = service.AuthResult_CREDENTIALS_MISSING
 		} else {
 			client := GetHttpClient()
 			jenkins := gojenkins.CreateJenkins(&client, creds.URL, creds.UserID, creds.Token)
 			if _, err := jenkins.Init(ctx); err != nil {
 				log.Error().Err(err).Msgf("Authentication failed")
-				result = service.AuthResult_AUTHENTICATION_FAILURE.Enum()
-				return &service.AuthCheckResult{
-					Result: result,
-				}, nil
-			}
-			log.Debug().Msg("Jenkins Authentication passed")
-			var jobs []*gojenkins.Job
-			jobs, err = jenkins.GetAllJobs(ctx)
-			if err != nil {
-				log.Error().Err(err).Msg("Unable to get Jenkins jobs")
-				result = service.AuthResult_AUTHENTICATION_FAILURE.Enum()
-				return &service.AuthCheckResult{
-					Result:          result,
-					AccountMetadata: nil,
-				}, nil
-			}
-			log.Debug().Msgf("jenkins.GetAllJobs passed. %v jobs found", len(jobs))
-			acctMeta, err = cs.makeAccountMetadata(ctx, jobs)
-			if err != nil {
-				log.Error().Err(err).Msg("Error occurred while building Account Metadata")
-				result = service.AuthResult_AUTHENTICATION_FAILURE.Enum()
-				return &service.AuthCheckResult{
-					Result:          result,
-					AccountMetadata: nil,
-				}, nil
+				result = service.AuthResult_AUTHENTICATION_FAILURE
 			}
 		}
 	}
-	log.Debug().Msg("Adding test data for integration testing")
+
 	return &service.AuthCheckResult{
-		Result:          result,
-		AccountMetadata: acctMeta,
+		Result: &result,
 	}, nil
 }
 
@@ -220,34 +194,12 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 
 	var jobs []*gojenkins.Job
 	if len(req.AssetIdentifiers) == 0 {
-		//jobs, err = jenkins.GetAllJobs(ctx)
-		var pipelineMeta map[string][]string
-		var job *gojenkins.Job
-		if req.Account.Metadata == nil {
-			log.Error(requestId).Msg("Account Metadata is missing in the request")
-			return nil, errors.New("error occurred while executing Jenkins Master")
-		}
-		err = json.Unmarshal(req.Account.Metadata, &pipelineMeta)
+		jobs, err = jenkins.GetAllJobs(ctx)
 		if err != nil {
-			log.Error(requestId).Err(err).Msg("Unable to unmarshal Jenkins jobs from Account Metadata")
-			return nil, errors.New("error occurred while executing Jenkins Master")
+			log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
+			return nil, err
 		}
-		log.Debug(requestId).Msg(fmt.Sprintf("pipelineMeta: %v\n", pipelineMeta))
-		for _, value := range pipelineMeta["pipeline"] {
-			parentIds := []string{}
-			log.Debug(requestId).Msg(fmt.Sprintf("Selected Job: %v\n", value))
-			tokens := strings.Split(value, "/")
-			if len(tokens) > 0 {
-				parentIds = tokens[:len(tokens)-1]
-			}
-			job, err = jenkins.GetJob(ctx, tokens[len(tokens)-1], parentIds...)
-			if err != nil {
-				log.Error(requestId).Err(err).Msgf("Unable to find Jenkins job for %s", value)
-				continue
-			}
-			jobs = append(jobs, job)
-		}
-		log.Debug(requestId).Msgf("jenkins.GetJobs from metadata passed. %v jobs found", len(jobs))
+		log.Debug(requestId).Msgf("jenkins.GetAllJobs passed. %v jobs found", len(jobs))
 	} else {
 
 		jobs, err = cs.getSelectedJobs(ctx, jenkins, req.AssetIdentifiers, *log.GetLogger(requestId))
@@ -382,29 +334,4 @@ func (cs *jenkinsMasterService) ExecuteAggregator(context.Context, *service.Exec
 
 func (cs *jenkinsMasterService) ExecuteAssessor(context.Context, *service.ExecuteRequest, plugin.AssetFetcher, service.CHPluginService_AssessorServer) (*service.ExecuteAssessorResponse, error) {
 	return nil, errors.New("Does not  support this role")
-}
-
-func (cs *jenkinsMasterService) makeAccountMetadata(ctx context.Context, jobs []*gojenkins.Job) ([]byte, error) {
-	var pipelineList []string
-	/*for _, job := range jobs {
-		switch GetJobClass(job.Raw.Class) {
-		case JobClassFolder:
-			if nestedJobs, err := cs.getInnerJobs(ctx, job); err != nil {
-				log.Error().Err(err).Msg("Unable to get nested jobs")
-				return nil, err
-			} else {
-				for _, nestedJob := range nestedJobs {
-					jobName := strings.ReplaceAll(nestedJob.Base, "/job/", "/")
-					pipelineList = append(pipelineList, jobName[1:])
-				}
-			}
-		case JobClassPipeline:
-			pipelineList = append(pipelineList, job.GetName())
-		}
-	}*/
-	pipelineList = []string{"BuildJobsTest/TestPipeline", "Playground/Vulnado"}
-	jobMap := map[string][]string{}
-	jobMap["pipeline"] = pipelineList
-	log.Debug().Msg(fmt.Sprintf("Pipelines : %+v\n", jobMap)) //testing purpose
-	return json.Marshal(jobMap)
 }
