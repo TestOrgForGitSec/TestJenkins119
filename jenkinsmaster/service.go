@@ -32,6 +32,11 @@ type jenkinsCreds struct {
 	Token  string `json:"token"`
 }
 
+type AccountConfig struct {
+	Pipelines []string    `json:"pipeline"`
+	Mapping   interface{} `json:"pipelineOutcomeMapping"`
+}
+
 type jenkinsMasterService struct {
 	service.CHPluginServiceServer
 }
@@ -220,31 +225,34 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 	var jobs []*gojenkins.Job
 	if len(req.AssetIdentifiers) == 0 {
 		//jobs, err = jenkins.GetAllJobs(ctx)
-		var pipelineMeta map[string][]string
+		var metadata *AccountConfig
 		var job *gojenkins.Job
 		if req.Account.Metadata == nil {
 			log.Error(requestId).Msg("Account Metadata is missing in the request")
 			return nil, errors.New("error occurred while executing Jenkins Master")
 		}
-		err = json.Unmarshal(req.Account.Metadata, &pipelineMeta)
+		err = json.Unmarshal(req.Account.Metadata, &metadata)
 		if err != nil {
 			log.Error(requestId).Err(err).Msg("Unable to unmarshal Jenkins jobs from Account Metadata")
 			return nil, errors.New("error occurred while executing Jenkins Master")
 		}
-		log.Debug(requestId).Msg(fmt.Sprintf("pipelineMeta: %v\n", pipelineMeta))
-		for _, value := range pipelineMeta["pipeline"] {
-			parentIds := []string{}
-			log.Debug(requestId).Msg(fmt.Sprintf("Selected Job: %v\n", value))
-			tokens := strings.Split(value, "/")
-			if len(tokens) > 0 {
-				parentIds = tokens[:len(tokens)-1]
+		log.Debug(requestId).Msg(fmt.Sprintf("Account Metadata: %v\n", metadata))
+		log.Debug(requestId).Msg(fmt.Sprintf("Total Saved Jobs in Metadata: %v\n", len((metadata.Pipelines))))
+		if len(metadata.Pipelines) > 0 {
+			for _, value := range metadata.Pipelines {
+				parentIds := []string{}
+				log.Debug(requestId).Msg(fmt.Sprintf("Selected Job: %v\n", value))
+				tokens := strings.Split(value, "/")
+				if len(tokens) > 0 {
+					parentIds = tokens[:len(tokens)-1]
+				}
+				job, err = jenkins.GetJob(ctx, tokens[len(tokens)-1], parentIds...)
+				if err != nil {
+					log.Error(requestId).Err(err).Msgf("Unable to find Jenkins job for %s", value)
+					continue
+				}
+				jobs = append(jobs, job)
 			}
-			job, err = jenkins.GetJob(ctx, tokens[len(tokens)-1], parentIds...)
-			if err != nil {
-				log.Error(requestId).Err(err).Msgf("Unable to find Jenkins job for %s", value)
-				continue
-			}
-			jobs = append(jobs, job)
 		}
 		log.Debug(requestId).Msgf("jenkins.GetJobs from metadata passed. %v jobs found", len(jobs))
 	} else {
