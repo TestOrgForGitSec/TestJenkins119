@@ -33,8 +33,7 @@ type jenkinsCreds struct {
 }
 
 type AccountConfig struct {
-	Pipelines []string    `json:"pipeline"`
-	Mapping   interface{} `json:"pipelineOutcomeMapping"`
+	Pipelines []string `json:"pipeline,omitempty"`
 }
 
 type jenkinsMasterService struct {
@@ -190,6 +189,7 @@ func (cs *jenkinsMasterService) getInnerJobs(ctx context.Context, j *gojenkins.J
 
 func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest, stream service.CHPluginService_MasterServer) ([]*domain.MasterResponse, error) {
 	accountFilter := viper.GetString("demo.account.filter")
+	log.Debug().Msgf(fmt.Sprintf("accountFilter: %v\n", accountFilter))
 	if accountFilter == req.Account.Uuid {
 		assetFilters := strings.Split(viper.GetString("demo.asset.filter"), ",,,")
 		req.AssetIdentifiers = assetFilters
@@ -225,21 +225,24 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 	var jobs []*gojenkins.Job
 	if len(req.AssetIdentifiers) == 0 {
 		//jobs, err = jenkins.GetAllJobs(ctx)
-		var metadata *AccountConfig
+		log.Debug(requestId).Msg("Empty Asset Identifiers")
+		var pMeta *AccountConfig
+		var pipelines []string
 		var job *gojenkins.Job
 		if req.Account.Metadata == nil {
 			log.Error(requestId).Msg("Account Metadata is missing in the request")
 			return nil, errors.New("error occurred while executing Jenkins Master")
 		}
-		err = json.Unmarshal(req.Account.Metadata, &metadata)
+		err = json.Unmarshal(req.Account.Metadata, &pMeta)
 		if err != nil {
 			log.Error(requestId).Err(err).Msg("Unable to unmarshal Jenkins jobs from Account Metadata")
 			return nil, errors.New("error occurred while executing Jenkins Master")
 		}
-		log.Debug(requestId).Msg(fmt.Sprintf("Account Metadata: %v\n", metadata))
-		log.Debug(requestId).Msg(fmt.Sprintf("Total Saved Jobs in Metadata: %v\n", len((metadata.Pipelines))))
-		if len(metadata.Pipelines) > 0 {
-			for _, value := range metadata.Pipelines {
+		log.Debug(requestId).Msg(fmt.Sprintf("Account Metadata: %v\n", pMeta))
+		pipelines = parsePipelineMap(pMeta)
+		log.Debug(requestId).Msg(fmt.Sprintf("Total Saved Jobs in Metadata: %v\n", len(pipelines)))
+		if len(pipelines) > 0 {
+			for _, value := range pipelines {
 				parentIds := []string{}
 				log.Debug(requestId).Msg(fmt.Sprintf("Selected Job: %v\n", value))
 				tokens := strings.Split(value, "/")
@@ -256,7 +259,7 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		}
 		log.Debug(requestId).Msgf("jenkins.GetJobs from metadata passed. %v jobs found", len(jobs))
 	} else {
-
+		log.Debug(requestId).Msgf(fmt.Sprintf("logging req.AssetIdentifiers : %v\n", strings.Join(req.AssetIdentifiers, ",")))
 		jobs, err = cs.getSelectedJobs(ctx, jenkins, req.AssetIdentifiers, *log.GetLogger(requestId))
 		if err != nil {
 			log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
@@ -416,4 +419,14 @@ func (cs *jenkinsMasterService) makeAccountMetadata(ctx context.Context, jobs []
 	jobMap["pipeline"] = pipelineList
 	log.Debug().Msg(fmt.Sprintf("Fetched Number of jobs: %v\n", len(pipelineList)))
 	return json.Marshal(jobMap)
+}
+
+func parsePipelineMap(pMap *AccountConfig) []string {
+	if pMap != nil {
+		log.Debug().Msgf(fmt.Sprintf("saved jobs: %v\n", pMap.Pipelines))
+		return pMap.Pipelines
+	}
+
+	return []string{}
+
 }
