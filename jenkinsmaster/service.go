@@ -189,7 +189,6 @@ func (cs *jenkinsMasterService) getInnerJobs(ctx context.Context, j *gojenkins.J
 
 func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest, stream service.CHPluginService_MasterServer) ([]*domain.MasterResponse, error) {
 	accountFilter := viper.GetString("demo.account.filter")
-	log.Debug().Msgf(fmt.Sprintf("accountFilter: %v\n", accountFilter))
 	if accountFilter == req.Account.Uuid {
 		assetFilters := strings.Split(viper.GetString("demo.asset.filter"), ",,,")
 		req.AssetIdentifiers = assetFilters
@@ -240,7 +239,6 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		}
 		log.Debug(requestId).Msg(fmt.Sprintf("Account Metadata: %v\n", pMeta))
 		pipelines = parsePipelineMap(pMeta)
-		log.Debug(requestId).Msg(fmt.Sprintf("Total Saved Jobs in Metadata: %v\n", len(pipelines)))
 		if len(pipelines) > 0 {
 			for _, value := range pipelines {
 				parentIds := []string{}
@@ -259,7 +257,6 @@ func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.
 		}
 		log.Debug(requestId).Msgf("jenkins.GetJobs from metadata passed. %v jobs found", len(jobs))
 	} else {
-		log.Debug(requestId).Msgf(fmt.Sprintf("logging req.AssetIdentifiers : %v\n", strings.Join(req.AssetIdentifiers, ",")))
 		jobs, err = cs.getSelectedJobs(ctx, jenkins, req.AssetIdentifiers, *log.GetLogger(requestId))
 		if err != nil {
 			log.Error(requestId).Err(err).Msg("Unable to get Jenkins jobs")
@@ -356,8 +353,8 @@ func extractJobDetails(baseURL string, pipeLineURL string, logger zerolog.Logger
 		return jobId, parentJobIds, err
 	}
 
-	logger.Trace().Msgf("Formed Base URL : %s", baseURL)
-	logger.Trace().Msgf("Original Asset URL : %s", pipeLineURL)
+	logger.Debug().Msgf("Formed Base URL : %s", baseURL)
+	logger.Debug().Msgf("Original Asset URL : %s", pipeLineURL)
 	// Remove the base from full url
 	result := strings.Split(pipeLineURL, baseURL)
 	filteredPath := result[len(result)-1]
