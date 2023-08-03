@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/bndr/gojenkins"
 	"github.com/cloudbees-compliance/chlog-go/log"
@@ -107,6 +108,8 @@ func toMasterResponse(jobDetails *gojenkins.JobResponse) *domain.MasterResponse 
 }
 
 func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req *service.AuthCheckRequest) (*service.AuthCheckResult, error) {
+
+	defer recordDuration(time.Now(), "ValidateAuthentication")
 	var result = service.AuthResult_SUCCESS.Enum()
 	ac := req.Account
 	credData, err := cs.parseAccount(ac)
@@ -151,6 +154,7 @@ func (cs *jenkinsMasterService) ValidateAuthentication(ctx context.Context, req 
 			}
 		}
 	}
+
 	return &service.AuthCheckResult{
 		Result:          result,
 		AccountMetadata: acctMeta,
@@ -182,6 +186,7 @@ func (cs *jenkinsMasterService) getInnerJobs(ctx context.Context, j *gojenkins.J
 }
 
 func (cs *jenkinsMasterService) ExecuteMaster(ctx context.Context, req *service.ExecuteRequest, stream service.CHPluginService_MasterServer) ([]*domain.MasterResponse, error) {
+	defer recordDuration(time.Now(), "ExecuteMaster")
 	accountFilter := viper.GetString("demo.account.filter")
 	if accountFilter == req.Account.Uuid {
 		assetFilters := strings.Split(viper.GetString("demo.asset.filter"), ",,,")
@@ -420,4 +425,9 @@ func parsePipelineMap(pMap *AccountConfig) []string {
 
 	return []string{}
 
+}
+
+func recordDuration(start time.Time, flow string) {
+
+	log.Debug().Msgf("Execution Time in %s : %s", flow, time.Since(start))
 }
